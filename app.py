@@ -54,6 +54,7 @@ def create_plot(selected_index, window_years):
 
     for idx in selected_index:
         df = split[idx]
+        df.index = pd.to_datetime(df.index)
         rolling_returns = psf_calc.compute_rolling_returns(df, window_years, 0.04)
 
         # Plot 1: Cumulative Return
