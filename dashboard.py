@@ -4,6 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import plotly.graph_objs as go
 import numpy as np
+import os
 import psf_library.cleaning as psf_clean
 import psf_library.calcs as psf_calc
 
@@ -153,5 +154,6 @@ def update_rolling_plot(selected_index, window_years):
     return fig1, fig2, fig3, fig4, fig5
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 8050))
+    app.run(host="0.0.0.0", port=port, debug=True)
 
