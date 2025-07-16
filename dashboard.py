@@ -11,7 +11,6 @@ daily_df = pd.read_csv("data/10Y_Daily_Returns.csv")
 split = psf_clean.split_columns_to_dfs(daily_df, "date")
 
 index_options = list(split.keys())
-print(index_options)
 window_options = [1, 3, 5]
 
 app_ui = ui.page_fluid(
@@ -32,7 +31,7 @@ app_ui = ui.page_fluid(
                 selected=["SPX Index", "SPW Index"],
                 multiple=True
             ),
-            col_widths=[6, 6]  # 2 columns, each 50% width
+            col_widths=[6, 6]
         ),
         class_="mx-auto",
         style="max-width: 800px;"
