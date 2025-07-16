@@ -1,4 +1,4 @@
-dash
+shiny
 pandas
 matplotlib
 plotly
