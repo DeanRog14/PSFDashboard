@@ -1,4 +1,5 @@
 shiny
+shinywidgets
 pandas
 matplotlib
 plotly
