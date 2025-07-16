@@ -1,159 +1,120 @@
-import dash
-from dash import dcc, html, Input, Output
+from shiny import App, ui, render
+from shinywidgets import output_widget, render_widget
 import pandas as pd
-import matplotlib.pyplot as plt
 import plotly.graph_objs as go
 import numpy as np
-import os
 import psf_library.cleaning as psf_clean
 import psf_library.calcs as psf_calc
 
 # Load and prep data
-daily_df = pd.read_csv('data/10Y_Daily_Returns.csv')
+daily_df = pd.read_csv("data/10Y_Daily_Returns.csv")
+split = psf_clean.split_columns_to_dfs(daily_df, "date")
 
-split = psf_clean.split_columns_to_dfs(daily_df, 'date')
+index_options = list(split.keys())
+print(index_options)
+window_options = [1, 3, 5]
 
-# Dash app
-app = dash.Dash(__name__)
-app.title = "Rolling Return Dashboard"
-
-app.layout = html.Div([
-    html.H2("Index Returns", style={'textAlign': 'center'}),
-
-    dcc.Dropdown(
-        id='window-select',
-        options=[
-            {'label': '1 Year', 'value': 1},
-            {'label': '3 Years', 'value': 3},
-            {'label': '5 Years', 'value': 5}
-        ],
-        value=1,
-        clearable=False,
-        style={'width': '200px', 'margin': 'auto'}
+app_ui = ui.page_fluid(
+    ui.h2("Index Returns", class_="text-center"),
+    
+    ui.div(
+        ui.layout_columns(
+            ui.input_select(
+                "window",
+                "Window (Years)",
+                {str(x): x for x in window_options},
+                selected="1"
+            ),
+            ui.input_select(
+                "indexes",
+                "Indexes",
+                {idx: idx for idx in index_options},
+                selected=["SPX Index", "SPW Index"],
+                multiple=True
+            ),
+            col_widths=[6, 6]  # 2 columns, each 50% width
+        ),
+        class_="mx-auto",
+        style="max-width: 800px;"
     ),
 
-    dcc.Dropdown(
-        id='index-select',
-        options=[{'label': idx, 'value': idx} for idx in split.keys()],
-        value=['SPX Index', 'SPW Index'],
-        multi=True,
-        clearable=False,
-        style={'width': '200px', 'margin': 'auto'}
-    ),
-
-    dcc.Graph(id='cumulative-plot'),
-    dcc.Graph(id='rolling-cumulative-plot'),
-    dcc.Graph(id='rolling-return-plot'),
-    dcc.Graph(id='volatility-plot'),
-    dcc.Graph(id='sharpe-plot'),
-
-])
-
-@app.callback(
-    Output('cumulative-plot', 'figure'),
-    Output('rolling-cumulative-plot', 'figure'),
-    Output('rolling-return-plot', 'figure'),
-    Output('volatility-plot', 'figure'),
-    Output('sharpe-plot', 'figure'),
-    Input('index-select', 'value'),
-    Input('window-select', 'value')
+    output_widget("cumulative_plot"),
+    output_widget("rolling_cumulative_plot"),
+    output_widget("rolling_return_plot"),
+    output_widget("volatility_plot"),
+    output_widget("sharpe_plot"),
 )
 
-def update_rolling_plot(selected_index, window_years):
+def create_plot(selected_index, window_years):
     fig1 = go.Figure()
     fig2 = go.Figure()
     fig3 = go.Figure()
     fig4 = go.Figure()
     fig5 = go.Figure()
+
     for idx in selected_index:
         df = split[idx]
         rolling_returns = psf_calc.compute_rolling_returns(df, window_years, 0.04)
 
-        # Cumulative Return
-        fig1.add_trace(go.Scatter(
-            x=rolling_returns.index,
-            y=rolling_returns['cumulative_return'],
-            mode='lines',
-            name=f'{idx} Cumulative Return'
-        ))
+        # Plot 1: Cumulative Return
+        fig1.add_trace(go.Scatter(x=rolling_returns.index, y=rolling_returns['cumulative_return'], mode='lines', name=idx))
 
-        fig1.update_layout(
-            title='Cumulative Return',
-            xaxis_title='Date',
-            yaxis_title='Cumulative Return',
-            yaxis=dict(
-                tickformat=".0%"),
-            template='plotly_white'
-        )
+        # Plot 2: Rolling Cumulative
+        fig2.add_trace(go.Scatter(x=rolling_returns.index, y=rolling_returns['rolling_cumulative_return'], mode='lines', name=idx))
 
-        fig2.add_trace(go.Scatter(
-            x=rolling_returns.index,
-            y=rolling_returns['rolling_cumulative_return'],
-            mode='lines',
-            name=f'{idx} Rolling Cumulative Return'
-        ))
+        # Plot 3: Annualized Return
+        fig3.add_trace(go.Scatter(x=rolling_returns.index, y=rolling_returns['annualized_return'], mode='lines', name=idx))
 
-        fig2.update_layout(
-            title=f'{window_years}Y Rolling Cumulative Return',
-            xaxis_title='Date',
-            yaxis_title='Cumulative Return',
-            yaxis=dict(
-                tickformat=".0%"),
-            template='plotly_white'
-        )
+        # Plot 4: Volatility
+        fig4.add_trace(go.Scatter(x=rolling_returns.index, y=rolling_returns['rolling_volatility'], mode='lines', name=idx))
 
-        # Rolling Return
-        fig3.add_trace(go.Scatter(
-            x=rolling_returns.index,
-            y=rolling_returns['annualized_return'],
-            mode='lines',
-            name=f'{idx} Rolling Return'
-        ))
+        # Plot 5: Sharpe
+        fig5.add_trace(go.Scatter(x=rolling_returns.index, y=rolling_returns['rolling_sharpe'], mode='lines', name=idx))
 
-        fig3.update_layout(
-            title=f'{window_years}Y Rolling Return',
-            xaxis_title='Date',
-            yaxis_title='Annualized Return',
-            yaxis=dict(
-                tickformat=".0%"),
-            template='plotly_white'
-        )
-
-        # Rolling Volatility
-        fig4.add_trace(go.Scatter(
-            x=rolling_returns.index,
-            y=rolling_returns['rolling_volatility'],
-            mode='lines',
-            name=f'{idx} Rolling Volatility'
-        ))
-
-        fig4.update_layout(
-            title=f'{window_years}Y Rolling Volatility',
-            xaxis_title='Date',
-            yaxis_title='Volatility',
-            yaxis=dict(
-                tickformat=".0%"),
-            template='plotly_white'
-        )
-
-        # Rolling Sharpe
-        fig5.add_trace(go.Scatter(
-            x=rolling_returns.index,
-            y=rolling_returns['rolling_sharpe'],
-            mode='lines',
-            name=f'{idx} Rolling Sharpe'
-        ))
-
-        fig5.update_layout(
-            title=f'{window_years}Y Rolling Sharpe',
-            xaxis_title='Date',
-            yaxis_title='Sharpe Ratio',
-            template='plotly_white'
+    for fig, title, ytitle, format_ in [
+        (fig1, "Cumulative Return", "Cumulative Return", ".0%"),
+        (fig2, f"{window_years}Y Rolling Cumulative Return", "Cumulative Return", ".0%"),
+        (fig3, f"{window_years}Y Rolling Return", "Annualized Return", ".0%"),
+        (fig4, f"{window_years}Y Rolling Volatility", "Volatility", ".0%"),
+        (fig5, f"{window_years}Y Rolling Sharpe", "Sharpe Ratio", ".2f")
+    ]:
+        fig.update_layout(
+            title=title,
+            xaxis_title="Date",
+            yaxis_title=ytitle,
+            hovermode="x unified",
+            template="plotly_white",
+            yaxis=dict(tickformat=format_)
         )
 
     return fig1, fig2, fig3, fig4, fig5
 
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 8050))
-    app.run(host="0.0.0.0", port=port, debug=True)
+
+def server(input, output, session):
+    @render_widget
+    def cumulative_plot():
+        return create_plot(input.indexes(), int(input.window()))[0]
+    output.cumulative_plot = cumulative_plot
+
+    @render_widget
+    def rolling_cumulative_plot():
+        return create_plot(input.indexes(), int(input.window()))[1]
+    output.rolling_cumulative_plot = rolling_cumulative_plot
+
+    @render_widget
+    def rolling_return_plot():
+        return create_plot(input.indexes(), int(input.window()))[2]
+    output.rolling_return_plot = rolling_return_plot
+
+    @render_widget
+    def volatility_plot():
+        return create_plot(input.indexes(), int(input.window()))[3]
+    output.volatility_plot = volatility_plot
+
+    @render_widget
+    def sharpe_plot():
+        return create_plot(input.indexes(), int(input.window()))[4]
+    output.sharpe_plot = sharpe_plot
+
+app = App(app_ui, server)
 
