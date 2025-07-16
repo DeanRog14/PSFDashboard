@@ -1,8 +1,9 @@
-from shiny import App, ui, render
+from shiny import App, ui, render, run_app
 from shinywidgets import output_widget, render_widget
 import pandas as pd
 import plotly.graph_objs as go
 import numpy as np
+import os
 import psf_library.cleaning as psf_clean
 import psf_library.calcs as psf_calc
 
@@ -11,7 +12,6 @@ daily_df = pd.read_csv("data/10Y_Daily_Returns.csv")
 split = psf_clean.split_columns_to_dfs(daily_df, "date")
 
 index_options = list(split.keys())
-print(index_options)
 window_options = [1, 3, 5]
 
 app_ui = ui.page_fluid(
@@ -117,3 +117,7 @@ def server(input, output, session):
     output.sharpe_plot = sharpe_plot
 
 app = App(app_ui, server)
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8501))
+    run_app(app, host="0.0.0.0", port=port)
